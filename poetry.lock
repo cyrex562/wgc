@@ -25,7 +25,23 @@ files = [
     {file = "colorama-0.4.6.tar.gz", hash = "sha256:08695f5cb7ed6e0531a20572697297273c47b8cae5a63ffc6d6ed5c201be6e44"},
 ]
 
+[[package]]
+name = "jsonpickle"
+version = "3.2.1"
+description = "Python library for serializing arbitrary object graphs into JSON"
+optional = false
+python-versions = ">=3.7"
+files = [
+    {file = "jsonpickle-3.2.1-py3-none-any.whl", hash = "sha256:ec291e4719674dd35d390fbdb521ac6517fbe9f541d361c8bffc8131133b1661"},
+    {file = "jsonpickle-3.2.1.tar.gz", hash = "sha256:4b6d7640974199f7acf9035295365b5a1a71a91109effa15ba170fbb48cf871c"},
+]
+
+[package.extras]
+docs = ["furo", "rst.linker (>=1.9)", "sphinx"]
+packaging = ["build", "twine"]
+testing = ["bson", "ecdsa", "feedparser", "gmpy2", "numpy", "pandas", "pymongo", "pytest (>=3.5,!=3.7.3)", "pytest-benchmark", "pytest-benchmark[histogram]", "pytest-checkdocs (>=1.2.3)", "pytest-cov", "pytest-enabler (>=1.0.1)", "pytest-ruff (>=0.2.1)", "scikit-learn", "scipy", "scipy (>=1.9.3)", "simplejson", "sqlalchemy", "ujson"]
+
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.12"
-content-hash = "c6202e701e6597827ef3a157ef21b519e1011941877efb14bbb77502a0796dd0"
+content-hash = "dc5731453157811f9b3e38b3fed023e1fabaa1cc0b498df1e0b451eb924ac196"

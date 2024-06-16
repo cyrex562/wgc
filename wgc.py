@@ -4,10 +4,12 @@ from typing import List
 import click
 import subprocess
 
+import jsonpickle
+
 class Peer:
     def __init__(self, public_key = '', allowed_ips = [], endpoint = '', persistent_keepalive = -1):
         self.public_key: str = public_key
-        self.allowed_ips: List[str] = allowed_ips
+        self.allowed_ips: List[IPv4Interface] = allowed_ips
         self.endpoint: str = endpoint
         self.persistent_keepalive: int = persistent_keepalive
 
@@ -15,14 +17,14 @@ class Peer:
 class Config:
     def __init__(self, config_file = '', address = '', listen_port = -1, private_key = '', mtu = -1):
         self.config_file: str = config_file
-        self.address: IPv4Interface|None = None
+        self.address: IPv4Interface = IPv4Interface('0.0.0.0/0')
         if address != '':
             self.address = IPv4Interface(address)
         self.listen_port: int = listen_port
         self.private_key: str = private_key
         self.mtu: int = mtu
         self.peers: List[Peer] = []
-        self.network: IPv4Network|None = None
+        self.network: IPv4Network = IPv4Network('0.0.0.0/0')
     
     
     def parse_from_file(self):
@@ -51,7 +53,9 @@ class Config:
                         if line.startswith("PublicKey"):
                             peer.public_key = line.split("=")[1].strip()
                         elif line.startswith("AllowedIPs"):
-                            peer.allowed_ips = line.split("=")[1].strip().split(",")
+                            allowed_ip_strings = line.split("=")[1].strip().split(",")
+                            for ais in allowed_ip_strings:
+                                peer.allowed_ips.append(IPv4Interface(ais.strip()))
                         elif line.startswith("Endpoint"):
                             peer.endpoint = line.split("=")[1].strip()
                         elif line.startswith("PersistentKeepalive"):
@@ -61,6 +65,9 @@ class Config:
                 else:
                     pass
                 line_ptr += 1
+    
+    def get_used_ip_addrs(self):
+        our_net = self.address.network
 
 
 @click.group()
@@ -75,15 +82,35 @@ def genkey():
     click.echo(f"{output}")
     
 @click.command()
+@click.option("--private-key", "-p", help="Private key", type=str, default='')
+@click.option("--input-file", "-i", help="Input file", type=str, default='')
+def pubkey(private_key, input_file):
+    if private_key != '' and input_file != '':
+        raise click.UsageError("Only one of private-key or input-file should be provided")
+    elif private_key == '' and input_file == '':
+        raise click.UsageError("One of private-key or input-file should be provided")
+    elif private_key != '':
+        key = private_key.encode("utf-8")
+    else:
+        with open(input_file, "r") as f:
+            key = f.read().encode("utf-8")
+    result = subprocess.run(["wg", "pubkey"], input=key, capture_output=True, check=True)
+    pub_key = result.stdout.decode("utf-8").strip()
+    print(f"{pub_key}")
+    
+
+@click.command()
 @click.option("--config-file", "-c", required=True, help="Path to the WireGuard configuration file")
 def test_parse_config(config_file):
     config = Config(config_file)
     config.parse_from_file()
-    print(f"Config: {config.__dict__}")
+    json_str = jsonpickle.encode(config, unpicklable=False, indent=2)
+    print(f"Config: {json_str}")
 
 
 cli.add_command(genkey)
 cli.add_command(test_parse_config)
+cli.add_command(pubkey)
 
 if __name__ == "__main__":
     cli()
