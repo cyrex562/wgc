@@ -7,9 +7,9 @@ import subprocess
 import jsonpickle
 
 class Peer:
-    def __init__(self, public_key = '', allowed_ips = [], endpoint = '', persistent_keepalive = -1):
+    def __init__(self, public_key = '', endpoint = '', persistent_keepalive = -1):
         self.public_key: str = public_key
-        self.allowed_ips: List[IPv4Interface] = allowed_ips
+        self.allowed_ips: List[IPv4Interface] = []
         self.endpoint: str = endpoint
         self.persistent_keepalive: int = persistent_keepalive
 
@@ -60,14 +60,34 @@ class Config:
                             peer.endpoint = line.split("=")[1].strip()
                         elif line.startswith("PersistentKeepalive"):
                             peer.persistent_keepalive = int(line.split("=")[1].strip())
+                        elif line == '\n':
+                            break
+                        else:
+                            print(f"Unknown line: {line}")
                         line_ptr += 1
                     self.peers.append(peer)
                 else:
                     pass
                 line_ptr += 1
     
-    def get_used_ip_addrs(self):
-        our_net = self.address.network
+    
+    def get_used_ip_addrs(self) -> List[IPv4Address]:
+        our_net = self.network
+        member_ips: List[IPv4Address] = []
+        member_ips.append(self.address.ip)
+        for peer in self.peers:
+            for allowed_ip in peer.allowed_ips:
+                if allowed_ip.network.subnet_of(our_net):
+                    member_ips.append(allowed_ip.ip)
+        return member_ips
+    
+    
+    def get_unused_ip_addrs(self) -> List[IPv4Address]:
+        our_net = self.network
+        all_ips = list(our_net.hosts())
+        used_ips = self.get_used_ip_addrs()
+        unused_ips = [ip for ip in all_ips if ip not in used_ips]
+        return unused_ips
 
 
 @click.group()
