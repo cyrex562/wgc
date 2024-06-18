@@ -133,6 +133,6 @@ cli.add_command(test_parse_config)
 cli.add_command(pubkey)
 
 if __name__ == "__main__":
-    cli()
+    cli(auto_envvar_prefix="WGC")
 
 # END
