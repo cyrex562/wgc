@@ -5,6 +5,7 @@ import click
 import subprocess
 
 import jsonpickle
+from loguru import logger
 
 class Peer:
     def __init__(self, public_key = '', endpoint = '', persistent_keepalive = -1):
@@ -90,18 +91,24 @@ class Config:
         return unused_ips
 
 
+# CLI object
 @click.group()
-def cli():
-    pass
+@click.option("--verbose", "-v", is_flag=True, help="Enable verbose mode", default = False)
+@click.option("--config-file", "-c", help="Path to the WireGuard configuration file")
+@click.pass_context
+def cli(ctx, verbose, config_file):
+    ctx.ensure_object(dict)
+    ctx.obj['VERBOSE'] = verbose
+    ctx.obj['CONFIG_FILE'] = config_file
 
 
-@click.command()
+@cli.command()
 def genkey():
     result = subprocess.run(["wg", "genkey"], capture_output=True, check=True)
     output = result.stdout.decode("utf-8")
     click.echo(f"{output}")
     
-@click.command()
+@cli.command()
 @click.option("--private-key", "-p", help="Private key", type=str, default='')
 @click.option("--input-file", "-i", help="Input file", type=str, default='')
 def pubkey(private_key, input_file):
@@ -119,18 +126,32 @@ def pubkey(private_key, input_file):
     print(f"{pub_key}")
     
 
-@click.command()
-@click.option("--config-file", "-c", required=True, help="Path to the WireGuard configuration file")
-def test_parse_config(config_file):
+@cli.command()
+@click.pass_context
+def test_parse_config(ctx):
+    config_file = ctx.obj['CONFIG_FILE']
+    if not os.path.exists(config_file):
+        raise click.UsageError(f"Config file {config_file} does not exist")
     config = Config(config_file)
     config.parse_from_file()
     json_str = jsonpickle.encode(config, unpicklable=False, indent=2)
     print(f"Config: {json_str}")
 
 
-cli.add_command(genkey)
-cli.add_command(test_parse_config)
-cli.add_command(pubkey)
+@cli.command()
+@click.option("--config-file", "-c", required=True, help="Path to the WireGuard configuration file")
+def edit_config(config_file):
+    click.edit(filename=config_file, require_save=True)
+
+
+
+# add commands to the cli
+# cli.add_command(genkey)
+# cli.add_command(test_parse_config)
+# cli.add_command(pubkey)
+# cli.add_command(edit_config)
+
+# entry point
 
 if __name__ == "__main__":
     cli(auto_envvar_prefix="WGC")
