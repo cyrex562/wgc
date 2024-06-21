@@ -89,6 +89,13 @@ class Config:
         used_ips = self.get_used_ip_addrs()
         unused_ips = [ip for ip in all_ips if ip not in used_ips]
         return unused_ips
+    
+    def get_next_avail_ip(self):
+        unused_ips = self.get_unused_ip_addrs()
+        if unused_ips.__len__() > 0:
+            return unused_ips[0]
+        else:
+            return None
 
 
 # CLI object
