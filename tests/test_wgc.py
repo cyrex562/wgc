@@ -38,13 +38,13 @@ def test_pubkey_two_opt():
 def test_get_used_ip_addrs():
     config = Config()
     config.config_file = "test_data/test_server.conf"
-    config.parse_from_file()
+    config.loadf()
     used_ips = config.get_used_ip_addrs()
     assert used_ips == EXPECTED_CONFIG_IPS
     
 def test_get_unused_ip_addrs():
     config = Config()
     config.config_file = "test_data/test_server.conf"
-    config.parse_from_file()
+    config.loadf()
     unused_ips = config.get_unused_ip_addrs()
     assert EXPECTED_CONFIG_IPS not in unused_ips

@@ -1,0 +1,5 @@
+%YAML 1.2
+---
+wg_dir: /etc/wireguard
+wg_path: /usr/bin/wg
+wg_quick_path: /usr/bin/wg-quick
