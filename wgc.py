@@ -41,12 +41,14 @@ class Config:
     def __init__(
         self,
         config_file: str = "",
+        peer_config_dir: str = "",
         address: str = "",
         listen_port: int = -1,
         private_key: str = "",
         mtu: int = -1,
     ):
         self.config_file: str = config_file
+        self.peer_config_dir: str = peer_config_dir
         self.address: IPv4Interface = IPv4Interface("0.0.0.0/0")
         if address != "":
             self.address = IPv4Interface(address)
@@ -140,8 +142,10 @@ class Config:
         # TODO: write peer config to file
 
         addr = peer.address
-        exploded = addr.exploded.split('.') 
-        peer_config_file_path = pathlib.Path(f'peer_{exploded[0]}_{exploded[1]}_{exploded[2]}_{exploded[3]}.conf')
+        exploded = addr.exploded.split(".")
+        peer_config_file_path = pathlib.Path(
+            f"peer_{exploded[0]}_{exploded[1]}_{exploded[2]}_{exploded[3]}.conf"
+        )
         peer_config_file_path = pathlib.Path()
         # TODO: add peer to main config
 
