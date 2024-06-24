@@ -3,3 +3,4 @@
 wg_dir: /etc/wireguard
 wg_path: /usr/bin/wg
 wg_quick_path: /usr/bin/wg-quick
+peer_config_dir: /etc/wireguard

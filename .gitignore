@@ -1,4 +1,6 @@
 dist/*
 __pycache__/*
 .pytest_cache/*
+
 __pycache__/wgc.cpython-312.pyc
+tests/__pycache__/test_wgc.cpython-312-pytest-8.2.2.pyc

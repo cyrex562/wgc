@@ -1,7 +1,8 @@
 from ipaddress import IPv4Address
 from click.testing import CliRunner
 import click
-from wgc import cli, Config
+from wgc import cli
+from wireguard_config import Config
 
 EXPECTED_CONFIG_IPS = [IPv4Address('10.70.0.1'), IPv4Address('10.70.0.3'), IPv4Address('10.70.0.4'), IPv4Address('10.70.0.5'), IPv4Address('10.70.0.6'), IPv4Address('10.70.0.7'), IPv4Address('10.70.0.8'), IPv4Address('10.70.0.9'), IPv4Address('10.70.0.10')]
 
@@ -38,13 +39,13 @@ def test_pubkey_two_opt():
 def test_get_used_ip_addrs():
     config = Config()
     config.config_file = "test_data/test_server.conf"
-    config.loadf()
+    config.from_file()
     used_ips = config.get_used_ip_addrs()
     assert used_ips == EXPECTED_CONFIG_IPS
     
 def test_get_unused_ip_addrs():
     config = Config()
     config.config_file = "test_data/test_server.conf"
-    config.loadf()
+    config.from_file()
     unused_ips = config.get_unused_ip_addrs()
     assert EXPECTED_CONFIG_IPS not in unused_ips

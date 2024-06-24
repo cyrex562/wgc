@@ -1,174 +1,14 @@
-from ipaddress import IPv4Address, IPv4Interface, IPv4Network
-from typing import List
 import click
 import subprocess
-import re
 import yaml
 import os
-import pathlib
 
 import jsonpickle
-from loguru import logger
+from click import Context
 
-
-class AppSettings:
-    def __init__(self):
-        wg_path = "/usr/bin/wg"
-        wg_quick_path = "/usr/bin/wg-quick"
-        wg_dir = "/etc/wireguard"
-        peer_config_dir = "/etc/wireguard"
-
-
-class Peer:
-    def __init__(
-        self,
-        private_key: str = "",
-        public_key: str = "",
-        endpoint: str = "",
-        persistent_keepalive: int = -1,
-        ip_interface: IPv4Interface = IPv4Interface("0.0.0.0/0"),
-        allowed_ips: List[IPv4Interface] = [],
-    ):
-        self.private_key: str = private_key
-        self.public_key: str = public_key
-        self.allowed_ips = allowed_ips
-        self.address: IPv4Interface = ip_interface
-        self.endpoint: str = endpoint
-        self.persistent_keepalive: int = persistent_keepalive
-
-
-class Config:
-    def __init__(
-        self,
-        config_file: str = "",
-        peer_config_dir: str = "",
-        address: str = "",
-        listen_port: int = -1,
-        private_key: str = "",
-        mtu: int = -1,
-    ):
-        self.config_file: str = config_file
-        self.peer_config_dir: str = peer_config_dir
-        self.address: IPv4Interface = IPv4Interface("0.0.0.0/0")
-        if address != "":
-            self.address = IPv4Interface(address)
-        self.listen_port: int = listen_port
-        self.private_key: str = private_key
-        self.mtu: int = mtu
-        self.peers: List[Peer] = []
-        self.network: IPv4Network = IPv4Network("0.0.0.0/0")
-
-    def loads(self, config_data: str):
-        splits = re.split(r"\[\W+\]", config_data, flags=re.MULTILINE)
-        for split in splits:
-            section = split.strip()
-            sec_lines = section.split("\n")
-            if sec_lines[0] == "Interface":
-                for line in sec_lines:
-                    if line.startswith("Address"):
-                        self.address = IPv4Interface(line.split("=")[1].strip())
-                        self.network = self.address.network
-                    elif line.startswith("ListenPort"):
-                        self.listen_port = int(line.split("=")[1].strip())
-                    elif line.startswith("PrivateKey"):
-                        self.private_key = line.split("=")[1].strip()
-                    elif line.startswith("MTU"):
-                        self.mtu = int(line.split("=")[1].strip())
-                    else:
-                        pass
-            elif sec_lines[0] == "Peer":
-                peer = Peer()
-                for line in sec_lines:
-                    if line.startswith("PublicKey"):
-                        peer.public_key = line.split("=")[1].strip()
-                    elif line.startswith("AllowedIPs"):
-                        allowed_ip_strings = line.split("=")[1].strip().split(",")
-                        for ais in allowed_ip_strings:
-                            peer.allowed_ips.append(IPv4Interface(ais.strip()))
-                    elif line.startswith("Endpoint"):
-                        peer.endpoint = line.split("=")[1].strip()
-                    elif line.startswith("PersistentKeepalive"):
-                        peer.persistent_keepalive = int(line.split("=")[1].strip())
-                    else:
-                        pass
-                self.peers.append(peer)
-
-    def loadf(self, config_file: str):
-        self.config_file = config_file
-        if not os.path.exists(config_file):
-            raise ValueError(f"Config file {config_file} does not exist")
-
-        with open(config_file, "r") as f:
-            config_buf = f.read()
-            self.loads(config_buf)
-
-    def get_used_ip_addrs(self) -> List[IPv4Address]:
-        our_net = self.network
-        member_ips: List[IPv4Address] = []
-        member_ips.append(self.address.ip)
-        for peer in self.peers:
-            for allowed_ip in peer.allowed_ips:
-                if allowed_ip.network.subnet_of(our_net):
-                    member_ips.append(allowed_ip.ip)
-        return member_ips
-
-    def get_unused_ip_addrs(self) -> List[IPv4Address]:
-        our_net = self.network
-        all_ips = list(our_net.hosts())
-        used_ips = self.get_used_ip_addrs()
-        unused_ips = [ip for ip in all_ips if ip not in used_ips]
-        return unused_ips
-
-    def get_next_avail_ip(self):
-        unused_ips = self.get_unused_ip_addrs()
-        if unused_ips.__len__() > 0:
-            return unused_ips[0]
-        else:
-            return None
-
-    def add_client_peer(self, allowed_ips: List[IPv4Interface] = []) -> str:
-        next_ip = self.get_next_avail_ip()
-        if next_ip is None:
-            raise ValueError("No more IP addresses available")
-        priv_key = int_gen_priv_key()
-        pub_key = calc_pub_key(priv_key)
-        peer = Peer(
-            private_key=priv_key,
-            public_key=pub_key,
-            ip_interface=IPv4Interface(f"{next_ip}/32"),
-            allowed_ips=allowed_ips,
-        )
-        peer_config = gen_client_peer_config(peer)
-        # TODO: write peer config to file
-
-        addr = peer.address
-        exploded = addr.exploded.split(".")
-        peer_config_file_path = pathlib.Path(
-            f"peer_{exploded[0]}_{exploded[1]}_{exploded[2]}_{exploded[3]}.conf"
-        )
-        peer_config_file_path = pathlib.Path()
-        # TODO: add peer to main config
-
-
-def int_gen_priv_key() -> str:
-    result = subprocess.run(["wg", "genkey"], capture_output=True, check=True)
-    output = result.stdout.decode("utf-8")
-    return output.strip()
-
-
-def calc_pub_key(private_key: str) -> str:
-    result = subprocess.run(
-        ["wg", "pubkey"],
-        input=private_key.encode("utf-8"),
-        capture_output=True,
-        check=True,
-    )
-    pub_key = result.stdout.decode("utf-8").strip()
-    return pub_key
-
-
-def gen_client_peer_config() -> str:
-    pass
+from .app_settings import AppSettings
+from wireguard_config import Config
+import wireguard_ops as ops
 
 
 # CLI object
@@ -176,76 +16,123 @@ def gen_client_peer_config() -> str:
 @click.option(
     "--verbose", "-v", is_flag=True, help="Enable verbose mode", default=False
 )
-@click.option("--config-file", "-c", help="Path to the WireGuard configuration file")
-@click.option("--settings-file", "-s", help="Path to the WireGuard configuration file")
+@click.option(
+    "--config-file", "-c", help="Path to the WireGuard configuration file", default=""
+)
+@click.option(
+    "--settings-file", "-s", help="Path to the WireGuard configuration file", type=click.File(), default=""
+)
 @click.pass_context
 def cli(ctx: click.Context, verbose: bool, config_file: str, settings_file: str):
     ctx.ensure_object(dict)
+
     ctx.obj["VERBOSE"] = verbose
-    ctx.obj["CONFIG_FILE"] = config_file
-    ctx.obj["SETTINGS_FILE"] = settings_file
 
-    if os.path.exists(settings_file):
-        with open(settings_file, "r") as f:
-            settings = yaml.load(f, Loader=yaml.FullLoader)
-            ctx.obj["SETTINGS"] = settings
-
-    if os.path.exists(config_file):
-        with open(config_file, "r") as f:
-            config = Config()
-            config.config_file = config_file
-            config.loadf()
-            ctx.obj["CONFIG"] = config
-
-
-@cli.command()
-def gen_priv_key():
-    val = int_gen_priv_key()
-    click.echo(f"{val}")
-
-
-@cli.command()
-@click.option("--private-key", "-p", help="Private key", type=str, default="")
-@click.option("--input-file", "-i", help="Input file", type=str, default="")
-def pubkey(private_key: str, input_file: str):
-    if private_key != "" and input_file != "":
-        raise click.UsageError(
-            "Only one of private-key or input-file should be provided"
-        )
-    elif private_key == "" and input_file == "":
-        raise click.UsageError("One of private-key or input-file should be provided")
-    elif private_key != "":
-        key = private_key.encode("utf-8")
+    # if config file is not provided, do nothing
+    if config_file == "":
+        pass
+    # if config file is provided, check if it exists
+    elif not os.path.exists(config_file):
+        raise ValueError(f"Config file {config_file} does not exist")
+    # if config file is provided and exists then load it
     else:
-        with open(input_file, "r") as f:
-            key = f.read().encode("utf-8")
+        config = Config.from_file(config_file)
+        ctx.obj["CONFIG"] = config
+
+    # if settings file is not provided, do nothing
+    if settings_file == "":
+        pass
+    elif not os.path.exists(settings_file):
+        raise ValueError(f"Settings file {settings_file} does not exist")
+    else:
+        settings = AppSettings.from_file(settings_file)
+        ctx.obj["SETTINGS"] = settings
+
+
+def check_load_config(ctx: Context):
+    # first check if the config is already loaded
+    if "CONFIG" in ctx.obj:
+        return ctx.obj["CONFIG"]
+    else:
+        raise ValueError("Config not loaded")
+
+
+@cli.group()
+def show():
+    pass
+
+
+@show.command(name="config")
+@click.pass_context
+def show_config(ctx: Context):
+    config: Config = ctx.obj["CONFIG"]
+    config_json = config.to_json()
+    click.echo(f"{config_json}")
+
+
+@show.command(name="peers")
+@click.pass_context
+def show_peers(ctx: Context):
+    raise NotImplemented()
+
+
+@show.command(name="addresses")
+@click.pass_context
+def show_addresses(ctx: Context):
+    raise NotImplemented()
+
+
+@show.command(name="used-addresses")
+@click.pass_context
+def show_used_addresses(ctx: Context):
+    raise NotImplemented
+
+
+@show.command(name="unused-addresses")
+@click.pass_context
+def show_unused_addresses(ctx: Context):
+    raise NotImplemented
+
+
+@show.command(name="public-key")
+@click.pass_context
+@click.option(
+    "--private-key", "-k", help="Private key to show public key for", type=str
+)
+def show_public_key(ctx: Context, private_key: str):
     result = subprocess.run(
-        ["wg", "pubkey"], input=key, capture_output=True, check=True
+        ["wg", "pubkey"], input=private_key, capture_output=True, check=True
     )
     pub_key = result.stdout.decode("utf-8").strip()
     click.echo(f"{pub_key}")
 
 
-@cli.command()
+@cli.group()
+def gen():
+    pass
+
+
+@gen.command(name="private-key")
+def gen_private_key():
+    val = ops.gen_priv_key()
+    click.echo(f"{val}")
+
+
+@gen.command(name="preshared-key")
+def gen_preshared_key():
+    val = ops.gen_psk()
+    click.echo(f"{val}")
+
+
+@cli.group()
+def config():
+    pass
+
+
+@config.command(name="edit")
 @click.pass_context
-def show_config(ctx: Context):
-    config_file = ctx.obj["CONFIG_FILE"]
-    if not os.path.exists(config_file):
-        raise click.UsageError(f"Config file {config_file} does not exist")
-    config = Config(config_file)
-    config.loadf()
-    json_str: str = jsonpickle.encode(config, unpicklable=False, indent=2)  # type: ignore
-    click.echo(f"Config: {json_str}")
+def edit_config(ctx: Context):
 
-
-@cli.command()
-@click.option(
-    "--config-file",
-    "-c",
-    required=True,
-    help="Path to the WireGuard configuration file",
-)
-def edit_config(config_file):
     click.edit(filename=config_file, require_save=True)
 
 
