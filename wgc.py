@@ -1,14 +1,13 @@
 import click
 import subprocess
-import yaml
-import os
 
-import jsonpickle
 from click import Context
+import pathlib
 
-from .app_settings import AppSettings
+from app_settings import AppSettings
 from wireguard_config import Config
 import wireguard_ops as ops
+
 
 
 # CLI object
@@ -17,44 +16,34 @@ import wireguard_ops as ops
     "--verbose", "-v", is_flag=True, help="Enable verbose mode", default=False
 )
 @click.option(
-    "--config-file", "-c", help="Path to the WireGuard configuration file", default=""
+    "--config-file",
+    "-c",
+    help="Path to the WireGuard configuration file",
+    type=click.Path(exists=True, file_okay=True, dir_okay=False, readable=True, writable=True, allow_dash=False, path_type=pathlib.Path,),
+    default=None,
 )
 @click.option(
-    "--settings-file", "-s", help="Path to the WireGuard configuration file", type=click.File(), default=""
+    "--settings-file",
+    "-s",
+    help="Path to the WireGuard configuration file",
+    type=click.Path(exists=True, file_okay=True, dir_okay=False, readable=True, writable=True, allow_dash=False, path_type=pathlib.Path,),
+    default=None,
 )
 @click.pass_context
-def cli(ctx: click.Context, verbose: bool, config_file: str, settings_file: str):
+def cli(ctx: click.Context, verbose: bool, config_file: pathlib.Path|None, settings_file: pathlib.Path|None):
     ctx.ensure_object(dict)
 
     ctx.obj["VERBOSE"] = verbose
 
-    # if config file is not provided, do nothing
-    if config_file == "":
-        pass
-    # if config file is provided, check if it exists
-    elif not os.path.exists(config_file):
-        raise ValueError(f"Config file {config_file} does not exist")
-    # if config file is provided and exists then load it
-    else:
-        config = Config.from_file(config_file)
+    if config_file is not None:
+        ctx.obj["CONFIG_FILE"] = config_file
+        config = Config.from_file(str(config_file))
         ctx.obj["CONFIG"] = config
 
-    # if settings file is not provided, do nothing
-    if settings_file == "":
-        pass
-    elif not os.path.exists(settings_file):
-        raise ValueError(f"Settings file {settings_file} does not exist")
-    else:
-        settings = AppSettings.from_file(settings_file)
+    if settings_file is not None:
+        ctx.obj["SETTINGS_FILE"] = settings_file
+        settings = AppSettings.from_file(str(settings_file))
         ctx.obj["SETTINGS"] = settings
-
-
-def check_load_config(ctx: Context):
-    # first check if the config is already loaded
-    if "CONFIG" in ctx.obj:
-        return ctx.obj["CONFIG"]
-    else:
-        raise ValueError("Config not loaded")
 
 
 @cli.group()
@@ -62,9 +51,21 @@ def show():
     pass
 
 
+def check_config_exists(ctx: Context):
+    """check if the context object has a config object. If not, raise a ValueError
+
+    :param ctx: a click Context object
+    :type ctx: Context
+    :raises ValueError: when config is not present
+    """
+    if "CONFIG" not in ctx.obj:
+        raise ValueError("Config not loaded")
+
+
 @show.command(name="config")
 @click.pass_context
 def show_config(ctx: Context):
+    check_config_exists(ctx)
     config: Config = ctx.obj["CONFIG"]
     config_json = config.to_json()
     click.echo(f"{config_json}")
@@ -73,7 +74,10 @@ def show_config(ctx: Context):
 @show.command(name="peers")
 @click.pass_context
 def show_peers(ctx: Context):
-    raise NotImplemented()
+    check_config_exists(ctx)
+    config: Config = ctx.obj["CONFIG"]
+    peers = config.peers
+    
 
 
 @show.command(name="addresses")
@@ -132,8 +136,8 @@ def config():
 @config.command(name="edit")
 @click.pass_context
 def edit_config(ctx: Context):
-
-    click.edit(filename=config_file, require_save=True)
+    check_config_exists(ctx)
+    click.edit(filename=ctx.obj["CONFIG_FILE"], require_save=True)
 
 
 # add commands to the cli
